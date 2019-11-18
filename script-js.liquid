@@ -1,0 +1,182 @@
+<script>
+  var selectCallback = function(variant, selector) {
+    if (variant) {
+      if (variant.available) {
+        // Selected a valid variant that is available.
+        $('.product-form-submit').removeClass('disabled').removeAttr('disabled').fadeTo(200,1);
+        $('.product-form-submit-text').text('Add to cart');
+        $('button.form-element-quantity-increment, button.form-element-quantity-decrement').show();
+        $('[name="quantity"]').val('1');
+      } else {
+        // Variant is sold out.
+        $('.product-form-submit').addClass('disabled').attr('disabled', 'disabled').fadeTo(200,0.5);
+        $('.product-form-submit-text').text('Sold out');
+        $('button.form-element-quantity-increment, button.form-element-quantity-decrement').hide();
+        $('[name="quantity"]').val('0');
+      }
+      if (variant.featured_image) {
+        $('.product-slideshow-image').each(function(){
+          var vid = $(this).data('product-slideshow-image');
+          if (vid == variant.featured_image.id) {
+            $(this).addClass('product-slideshow-image-selected');
+          } else {
+            $(this).removeClass('product-slideshow-image-selected');
+          }
+        });
+        $('.product-slideshow-thumbnail').each(function(){
+          var vtid = $(this).data('product-slideshow-thumbnail');
+          if (vtid == variant.featured_image.id) {
+            $(this).addClass('is-selected product-slideshow-thumbnail-selected').attr('aria-selected','true');
+          } else {
+            $(this).removeClass('is-selected product-slideshow-thumbnail-selected');
+          }
+        });
+      }
+    } else {
+      // variant doesn't exist.
+      $('.product-form-submit').addClass('disabled').attr('disabled', 'disabled').fadeTo(200,0.5);
+      $('.product-form-submit-text').text('Sold out');
+      $('button.form-element-quantity-increment, button.form-element-quantity-decrement').hide();
+      $('[name="quantity"]').val('0');
+    }
+  };
+
+  jQuery(function() {
+    $('.swatch-color:input[type=radio]').click(function(e) {
+      $('.swatch-size').prop('checked', false);
+      $('#swatchselt-size').html('');
+    });
+  });
+  
+  jQuery(function($) {
+    new Shopify.OptionSelectors('productSelect', {
+      product: {{ product | json }},
+      onVariantSelected: selectCallback,
+      enableHistoryState: true
+    });
+
+    // Add label if only one product option and it isn't 'Title'. Could be 'Size'.
+    {% if product.options.size == 1 and product.options.first != 'Title' %}
+      $('.selector-wrapper:eq(0)').prepend('<label for="productSelect-option-0">{{ product.options.first | escape }}</label>');
+      $('.selector-wrapper:eq(0)').append('<div class="clearfix"></div>');
+    {% endif %}
+
+    // Hide selectors if we only have 1 variant and its title contains 'Default'.
+    {% if product.variants.size == 1 and product.variants.first.title contains 'Default' %}
+      $('.selector-wrapper').hide();
+    {% endif %}
+    $('.selector-wrapper').append('<div class="clearfix"></div>');
+  });
+  jQuery(function() {
+var Shopify = Shopify || {};
+Shopify.optionsMap = {};
+Shopify.updateOptionsInSelector = function(selectorIndex) {
+    
+  switch (selectorIndex) {
+    case 0:
+      var key = 'root';
+      var selector = jQuery('.single-option-selector:eq(0)');
+      break;
+    case 1:
+      var key = jQuery('.single-option-selector:eq(0)').val();
+      var selector = jQuery('.single-option-selector:eq(1)');
+      break;
+    case 2:
+      var key = jQuery('.single-option-selector:eq(0)').val();  
+      key += ' / ' + jQuery('.single-option-selector:eq(1)').val();
+      var selector = jQuery('.single-option-selector:eq(2)');
+  }
+  
+  var initialValue = selector.val();
+  selector.empty();    
+  var availableOptions = Shopify.optionsMap[key];
+  for (var i=0; i<availableOptions.length; i++) {
+    var option = availableOptions[i];
+    var newOption = jQuery('<option></option>').val(option).html(option);
+    selector.append(newOption);
+  }
+  jQuery('.swatch[data-option-index="' + selectorIndex + '"] .swatch-element').each(function() {
+    if (jQuery.inArray(jQuery(this).attr('data-value'), availableOptions) !== -1) {
+      jQuery(this).removeClass('soldout').addClass('available').find(':radio').removeAttr('disabled','disabled');
+    }
+    else {
+      jQuery(this).addClass('soldout').removeClass('available').find(':radio').removeAttr('checked');
+    }
+  });
+  if (jQuery.inArray(initialValue, availableOptions) !== -1) {
+    selector.val(initialValue);
+  }
+  selector.trigger('change');  
+  
+};
+Shopify.linkOptionSelectors = function(product) {
+  // Building our mapping object.
+  for (var i=0; i<product.variants.length; i++) {
+    var variant = product.variants[i];
+    if (variant.available) {
+      // Gathering values for the 1st drop-down.
+      Shopify.optionsMap['root'] = Shopify.optionsMap['root'] || [];
+      Shopify.optionsMap['root'].push(variant.option1);
+      Shopify.optionsMap['root'] = jQuery.unique(Shopify.optionsMap['root']);
+      // Gathering values for the 2nd drop-down.
+      if (product.options.length > 1) {
+        var key = variant.option1;
+        Shopify.optionsMap[key] = Shopify.optionsMap[key] || [];
+        Shopify.optionsMap[key].push(variant.option2);
+        Shopify.optionsMap[key] = jQuery.unique(Shopify.optionsMap[key]);
+      }
+      // Gathering values for the 3rd drop-down.
+      if (product.options.length === 3) {
+        var key = variant.option1 + ' / ' + variant.option2;
+        Shopify.optionsMap[key] = Shopify.optionsMap[key] || [];
+        Shopify.optionsMap[key].push(variant.option3);
+        Shopify.optionsMap[key] = jQuery.unique(Shopify.optionsMap[key]);
+      }
+    }
+  }
+  // Update options right away.
+  Shopify.updateOptionsInSelector(0);
+  if (product.options.length > 1) Shopify.updateOptionsInSelector(1);
+  if (product.options.length === 3) Shopify.updateOptionsInSelector(2);
+  // When there is an update in the first dropdown.
+  jQuery(".single-option-selector:eq(0)").change(function() {
+    Shopify.updateOptionsInSelector(1);
+    if (product.options.length === 3) Shopify.updateOptionsInSelector(2);
+    return true;
+  });
+  // When there is an update in the second dropdown.
+  jQuery(".single-option-selector:eq(1)").change(function() {
+    if (product.options.length === 3) Shopify.updateOptionsInSelector(2);
+    return true;
+  });  
+};
+ 
+{% if product.available and product.options.size > 1 %}
+  var $addToCartForm = jQuery('form[action="/cart/add"]');
+  if (window.MutationObserver && $addToCartForm.length) {
+    if (typeof observer === 'object' && typeof observer.disconnect === 'function') {
+      observer.disconnect();
+    }
+    var config = { childList: true, subtree: true };
+    var observer = new MutationObserver(function() {      
+      Shopify.linkOptionSelectors({{ product | json }});
+      observer.disconnect();
+    });  
+    observer.observe($addToCartForm[0], config);
+  }
+{% endif %}
+  $( "p span" ).first().addClass( "highlight" );
+
+  jQuery('.swatch :radio').change(function() {
+    var optionIndex = jQuery(this).closest('.swatch').attr('data-option-index');
+    var optionValue = jQuery(this).val();
+    jQuery(this)
+      .closest('form')
+      .find('.single-option-selector')
+      .eq(optionIndex)
+      .val(optionValue)
+      .trigger('change');
+  });
+});
+</script>
+{%- section 'custom-clr' -%}
