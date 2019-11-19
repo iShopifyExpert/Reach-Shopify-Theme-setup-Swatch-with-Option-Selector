@@ -1,0 +1,35 @@
+{% comment %}
+Replace with default file content
+Display options for a product
+
+@param product
+The product to show options for.
+
+@param type
+Can be "radio" or "select".
+{% endcomment %}
+
+{% assign _type = type | default: 'radio' %}
+
+{% if product.has_only_default_variant %}
+<input name="id" type="hidden" value="{{ product.selected_or_first_available_variant.id }}">
+{% else %}
+
+<div class="product-options product-options-type-{{ _type }}" data-product-options>
+  {% comment %}
+  Variant select. This is the source-of-truth for which variant to add.
+  {% endcomment %}
+  <select name="id" style="display: none;" id="productSelect" class="productSelect" data-variants>
+    {% for variant in product.variants %}
+    <option value="{{ variant.id }}">
+      {{ variant.title }} - {{ variant.price | money }}
+    </option>
+    {% endfor %}
+  </select>
+  {% if product.available and product.variants.size > 1 %}
+  {% for option in product.options %}
+  {% include 'swatch' with option %}
+  {% endfor %}
+  {% endif %}
+</div>
+{% endif %}
